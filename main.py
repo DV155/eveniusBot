@@ -39,8 +39,7 @@ def handle_response(text: str):
         return("Use the /stock command to check stock prices")
     
     if "alert" in processed:
-        return("Use the /alert command to set an alert")
-    
+        return("Use the /alert command to set an alert")  
     return("I don't understand your input. Use /help if you're struggling with something")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
