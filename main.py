@@ -49,11 +49,11 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lang = "en"
         return OPTION1
     elif query.data == "option2":
-        await query.edit_message_text(text="You selected German.")
+        await query.edit_message_text(text="Sie haben Deutsch gewählt.")
         lang = "de"
         return OPTION2
     elif query.data == "option3":
-        await query.edit_message_text(text="You selected Russian.")
+        await query.edit_message_text(text="Вы выбрали русский.")
         lang = "ru"
         return OPTION3
     else:
