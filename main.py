@@ -68,7 +68,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if (lang == "en") or (lang == None):
+    if (lang == "en") or (lang is None):
         await update.message.reply_text("Please choose the 'stock' menu and type the name of the asset you're interested in. The bot will scout its sources to deliver an answer as accurately as possible")
     elif lang == "de":
         await update.message.reply_text("Bitte wählen Sie das 'stock'-Menü und geben Sie den Namen des Vermögenswerts ein, an dem Sie interessiert sind. Der Bot wird seine Quellen durchsuchen, um eine Antwort so genau wie möglich zu liefern")
@@ -76,7 +76,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Пожалуйста, выберите меню 'stock' и введите название интересующего вас актива. Бот будет искать информацию в своих источниках, чтобы предоставить максимально точный ответ")
 
 async def stock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if (lang == "en") or (lang == None):
+    if (lang == "en") or (lang is None):
         await update.message.reply_text("Type the name of the asset you're interested in")
     elif lang == "de":
         await update.message.reply_text("Geben Sie den Namen des Vermögenswerts ein, an dem Sie interessiert sind")
