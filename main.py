@@ -1,5 +1,5 @@
 from typing import Final
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile
 from telegram.ext import (
     Application, 
     CommandHandler,
@@ -14,6 +14,7 @@ import yfinance as yf
 import matplotlib.pyplot as plt
 import os
 import logging
+import io
 from dotenv import load_dotenv
 
 
@@ -164,11 +165,13 @@ def handle_response(text: str, context: ContextTypes.DEFAULT_TYPE =None, chat_id
         data = stock.info.get('regularMarketPrice', None)
         if data is not None:
             if (lang == "en") or (lang is None):
-                answer = f"{ticker} is trading for {data} $ on the NASDAQ"
+                answer = f"{ticker} is trading for {data} $ on the NASDAQ. Use /stock again to check another asset"
             elif lang == "de":
-                answer = f"{ticker} wird an der NASDAQ für {data} $ gehandelt"
+                answer = f"{ticker} wird an der NASDAQ für {data} $ gehandelt. Verwenden Sie /stock nochmal, um einen anderen Vermögenswert zu überprüfen"
             else:
-                answer = f"{ticker} торгуется на NASDAQ по цене {data} $"   
+                answer = f"{ticker} торгуется на NASDAQ по цене {data} $. Используйте /stock снова, чтобы проверить другой актив"   
+            buf = generate_chart(ticker, lang)
+            return buf, answer
         else:
             if (lang == "en") or (lang is None):
                 answer = f"Sorry, I couldn't find any information on {ticker}. Check your spelling or use the ticker symbol instead of the name of the asset"
@@ -176,8 +179,34 @@ def handle_response(text: str, context: ContextTypes.DEFAULT_TYPE =None, chat_id
                 answer = f"Entschuldigung, ich konnte keine Informationen zu {ticker} finden. Überprüfen wie Sie es geschrieben haben oder verwenden Sie das Tickersymbol anstelle des Namens des Vermögenswerts"
             else:
                 answer = f"Извините, я не смог найти информацию о {ticker}. Проверьте правильность написания или используйте тикер вместо названия актива"
-        return answer
+            return answer
+             
 
+def generate_chart(ticker: str, lang: str):
+    stock = yf.Ticker(ticker)
+    hist = stock.history(period="1mo")
+    
+    plt.figure(figsize=(10, 5))
+    plt.plot(hist.index, hist['Close'])
+    
+    if lang == "en" or lang is None:
+        plt.title(f"{ticker} in the last 30 Days")
+        plt.xlabel("Date")
+        plt.ylabel("Price ($)")
+    elif lang == "de":
+        plt.title(f"{ticker} in den letzten 30 Tagen")
+        plt.xlabel("Datum")
+        plt.ylabel("Preis ($)")
+    else:
+        plt.title(f"{ticker} за последние 30 дней")
+        plt.xlabel("День")
+        plt.ylabel("Цена ($)")
+    
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    plt.close()
+    return buf
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_type: str = update.message.chat.type
@@ -189,14 +218,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return 
     if message_type == "group":
         if BOT_USERNAME in text:
-            new_text: str = text.replace(BOT_USERNAME, "").strip()
-            response: str = handle_response(new_text, context, update.message.chat_id)
+            text: str = text.replace(BOT_USERNAME, "").strip()
         else:
             return
+    response = handle_response(text, context, update.message.chat_id)
+
+    if isinstance(response, tuple):
+        buf, answer = response
+        await update.message.reply_photo(photo=InputFile(buf))
+        await update.message.reply_text(answer)
     else:
-        response: str = handle_response(text, context, update.message.chat_id)
-    logger.info(f"Bot:, {response}")
-    await update.message.reply_text(response)
+        await update.message.reply_text(response)   
 
 
 def main():
