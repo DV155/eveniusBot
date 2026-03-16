@@ -1,4 +1,3 @@
-from typing import Final
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile
 from telegram.ext import (
     Application, 
@@ -150,7 +149,10 @@ def handle_response(text: str, context: ContextTypes.DEFAULT_TYPE =None, chat_id
         settingAlert = False
         tickerAlert = text.upper().split()
         alertName = tickerAlert[0]
-        alertPrice  = float(tickerAlert[1])
+        try:
+            alertPrice = float(tickerAlert[1])
+        except:
+            alertPrice
         context.job_queue.run_repeating(
             check_alert,
             interval=60,
@@ -199,7 +201,7 @@ def generate_chart(ticker: str, lang: str):
         plt.ylabel("Preis ($)")
     else:
         plt.title(f"{ticker} за последние 30 дней")
-        plt.xlabel("День")
+        plt.xlabel("Дата")
         plt.ylabel("Цена ($)")
     
     buf = io.BytesIO()
@@ -234,7 +236,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
 
     logger.info("Starting bot...")
-    app = app = Application.builder().token(TOKEN).job_queue(JobQueue()).build()
+    app = Application.builder().token(TOKEN).job_queue(JobQueue()).build()
 
     conv_handler = ConversationHandler(
         entry_points=[
