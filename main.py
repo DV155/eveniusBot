@@ -21,11 +21,7 @@ load_dotenv()
 TOKEN = os.getenv("API_TOKEN")
 BOT_USERNAME = os.getenv("BOT_HANDLE")
 MENU, AWAITING_INPUT, AWAITING_ALERT = range(3)
-lang = None
-lookingForStock = False
-settingAlert = False
-answer = None
-alertPrice = 0
+
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -48,8 +44,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    global lang
-    global answer
 
     if query.data == "option1":
         await query.edit_message_text(text="You selected English.")
@@ -71,6 +65,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    lang = context.user_data.get("lang")
     if (lang == "en") or (lang is None):
         await update.message.reply_text("Please choose the 'stock' menu and type the name of the asset you're interested in. The bot will scout its sources to deliver an answer as accurately as possible")
     elif lang == "de":
@@ -79,8 +74,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Пожалуйста, выберите меню 'stock' и введите название интересующего вас актива. Бот будет искать информацию в своих источниках, чтобы предоставить максимально точный ответ")
 
 async def stock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global lookingForStock
-    lookingForStock = True
+    context.user_data["lookingForStock"] = True
+    lang = context.user_data.get("lang")
 
     if (lang == "en") or (lang is None):
         await update.message.reply_text("Type the name of the asset you're interested in")
@@ -91,8 +86,8 @@ async def stock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return AWAITING_INPUT
 
 async def alert_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global settingAlert
-    settingAlert = True
+    context.user_data["settingAlert"] = True
+    lang = context.user_data.get("lang")
     if (lang == "en") or (lang is None):
         await update.message.reply_text("Type the name of the desired asset in the form 'Ticker Price', e.g. 'TSLA 200'. The bot will recheck the price and send you an alert when the desired price is reached")
     elif lang == "de":
@@ -115,6 +110,7 @@ async def check_alert(context: ContextTypes.DEFAULT_TYPE):
     jobAlertName = job_data["alertName"]
     jobAlertPrice = job_data["alertPrice"]
     chat_id = job_data["chat_id"]
+    lang = job_data["lang"]
     job_data["checks"] += 1
     if job_data["checks"] >= 44640:
         if (lang == "en") or (lang is None):
@@ -123,6 +119,7 @@ async def check_alert(context: ContextTypes.DEFAULT_TYPE):
             alertText = f"Benachrichtigung für {jobAlertName} bei {jobAlertPrice} $ ist nach 31 Tagen ohne Erreichen des gewünschten Preises abgelaufen"
         else:
             alertText = f"Напоминание для {jobAlertName} при {jobAlertPrice} $ истекло после 31 дня без достижения желаемой цены"
+        await context.bot.send_message(chat_id=chat_id, text=alertText)
         context.job.schedule_removal()
         return
     stockName = yf.Ticker(jobAlertName)
@@ -141,9 +138,10 @@ async def check_alert(context: ContextTypes.DEFAULT_TYPE):
 def handle_response(text: str, context: ContextTypes.DEFAULT_TYPE =None, chat_id=None):
     processed: str = text.lower()
     
-    global lookingForStock 
-    global settingAlert
-    global alertPrice
+    lang = context.user_data.get("lang")
+
+    if context.user_data.get("settingAlert"):
+        context.user_data["settingAlert"] = False
 
     if settingAlert == True:
         settingAlert = False
@@ -151,17 +149,17 @@ def handle_response(text: str, context: ContextTypes.DEFAULT_TYPE =None, chat_id
         alertName = tickerAlert[0]
         try:
             alertPrice = float(tickerAlert[1])
-        except:
-            alertPrice
+        except (IndexError, ValueError):
+            return "Use the format 'TICKER PRICE', e.g. 'TSLA 200'"
         context.job_queue.run_repeating(
             check_alert,
             interval=60,
-            data={"alertName": alertName, "alertPrice": alertPrice, "chat_id": chat_id, "checks": 0}
+            data={"alertName": alertName, "alertPrice": alertPrice, "chat_id": chat_id, "checks": 0, "lang": lang}
         )
         return f"Alert set for {alertName} at ${alertPrice}"
 
-    if lookingForStock == True:
-        lookingForStock = False
+    if context.user_data.get("lookingForStock"):
+        context.user_data["lookingForStock"] = False
         ticker = text.upper()
         stock = yf.Ticker(ticker)
         data = stock.info.get('regularMarketPrice', None)
@@ -216,7 +214,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     logger.info(f"User ({update.message.chat.id}) in {message_type}: {text}")
 
-    if (not lookingForStock) and (not settingAlert):
+    if not context.user_data.get("lookingForStock") and not context.user_data.get("settingAlert"):
         return 
     if message_type == "group":
         if BOT_USERNAME in text:
